@@ -1,6 +1,12 @@
 const express = require('express');
 const router = express.Router();
+const gravatar = require('gravatar');
+const bcrypt = require('bcryptjs');
+const config = require('config');
+const jwt = require('jsonwebtoken');
 const { check, validationResult } = require('express-validator');
+
+const User = require('../../models/Users');
 
 // @route   POST api/users
 // @desc    Register user
@@ -18,7 +24,7 @@ router.post(
       'Please enter a password with 6 or more characters'
     ).isLength({ min: 6 })
   ],
-  (req, res) => {
+  async (req, res) => {
     const errors = validationResult(req);
 
     // if there ARE errors
@@ -27,15 +33,71 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
 
-    // See if user exists
+    // destructure data from req.body
+    const { name, email, password } = req.body;
 
-    // Get users gravatar
+    try {
+      // See if user exists (mongoose query)
+      let user = await User.findOne({ email });
 
-    // Encrypt password
+      if (user) {
+        return res
+          .status(400)
+          .json({ errors: [{ msg: 'User already exists' }] });
+      }
 
-    // Return jsonwebtoken
+      // Get users gravatar
+      const avatar = gravatar.url(email, {
+        // Size
+        s: '200',
+        // Rating
+        r: 'pg',
+        // Default (mm = default image)
+        d: 'mm'
+      });
 
-    res.send('User route');
+      //   1. create user
+      //   2. hash the password
+      //   3. save the user to database
+      //   4. get the payload which includes the user id
+      //   6. sign the token and pass in the payload, pass in the secret, expiration, callback (error or return token)
+
+      user = new User({
+        name,
+        email,
+        avatar,
+        password
+      });
+
+      // Encrypt password
+      // create a salt
+      const salt = await bcrypt.genSalt(10); // 10 is recommended
+
+      user.password = await bcrypt.hash(password, salt);
+
+      await user.save(); // saves user to database
+
+      // Return jsonwebtoken
+      const payload = {
+        user: {
+          id: user.id
+        }
+      };
+
+      // takes in payload, secret key, additional opetions, callback function(for errors checks or return token)
+      jwt.sign(
+        payload,
+        config.get('jwtSecret'),
+        { expiresIn: 360000 }, // change to 3600s (1hr) for production
+        (err, token) => {
+          if (err) throw err;
+          res.json({ token });
+        }
+      );
+    } catch (err) {
+      console.error(err.message);
+      res.status(500).send('Server error');
+    }
   }
 );
 
