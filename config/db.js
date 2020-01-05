@@ -10,7 +10,8 @@ const connectDB = async () => {
     await mongoose.connect(db, {
       useNewUrlParser: true, // removes 'DepreciationWarning' for URL string parser
       useUnifiedTopology: true, // removes 'DepreciationWarning' for Server Discovery & Monitoring
-      useCreateIndex: true // removes 'DepreciationWarning' collection.ensureIndex
+      useCreateIndex: true, // removes 'DepreciationWarning' collection.ensureIndex
+      useFindAndModify: false // removes 'DepreciationWarning' findOneAndUpdate
     });
 
     console.log('MongoDB Connected...');
